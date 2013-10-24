@@ -73,17 +73,21 @@ def main():
         defender.refillHand(deck)
         
         print "\nTrump card: ", trumpCard
+        print "Cards left: ", len(deck)
+        print "%s cards left: " % pOne.name, len(pOne.hand)
+        print "%s cards left: " % pTwo.name, len(pTwo.hand)
+
         table = []
-        attacker.attack(table)
-        while attacker.success:
-            defender.defend(table, trumpSuit)
-            if not defender.success: break
+        while True:
             attacker.attack(table)
-        
-        if defender.success:
+            if not attacker.success or len(attacker.hand) == 0: break
+            defender.defend(table, trumpSuit)
+            if not defender.success or len(defender.hand) == 0: break
+         
+        if (defender.success and not attacker.success) or len(defender.hand) == 0:
             print "%s wins the round and gets to attack." % defender.name
             attacker, defender = defender, attacker
-        elif attacker.success:
+        elif (attacker.success and not defender.success) or len(attacker.hand) == 0:
             print "%s wins the round and remains the attacker." % attacker.name
             defender.hand.extend(table)
         

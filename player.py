@@ -133,8 +133,49 @@ class CPUPlayer(Player):
         super(CPUPlayer, self).__init__(verbose)
 
     def attack(self, table):
-        pass
+        if self.verbose >= 1:
+            print "----ATTACK----"
+
+        if len(table) == 0:
+            i = random.randint(0, len(self.hand) - 1)
+            attackCard = self.hand.pop(i)
+            table.insert(0, attackCard)
+            self.success = True
+        else:
+            attackingOptions = self.getAttackingCards(table)
+            if len(attackingOptions) == 0: 
+                self.success = False
+                print "  %s cannot attack." % self.name
+                return
+            
+            i = random.randint(-1, len(attackingOptions) - 1)
+            if i == -1: 
+                self.success = False
+                print "  %s gives up the attack." % self.name
+                return
+            attackCard = attackingOptions[i]
+            table.insert(0, attackCard)
+            self.hand.remove(attackCard)
+            self.success = True
+        print "  %s attacks with %s" % (self.name, attackCard)
 
     def defend(self, table, trumpSuit):
-        pass
+        if self.verbose >= 1:
+            print "----DEFEND----"
+
+        defendingOptions = self.getDefendingCards(table[0], trumpSuit)
+        if len(defendingOptions) == 0: 
+            self.success = False
+            print "  %s cannot defend." % self.name
+            return
+
+        i = random.randint(-1, len(defendingOptions) - 1)
+        if i == -1:
+            self.success = False
+            print "  %s surrenders." % self.name
+            return
+        table.insert(0, defendingOptions[i])
+        self.hand.remove(defendingOptions[i])
+        self.success = True
+        print "  %s defends with %s" % (self.name, defendingOptions[i])
 
