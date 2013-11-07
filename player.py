@@ -15,23 +15,99 @@ class Player(object):
 
         # For card counting
         self.opponentHand = []
-        self.numOpponentCards = 6
 
-    def attack(self, table):
+    def attack(self, table, trumpCard, deckSize, opponentHandSize, trashCards):
         """
         Given |table| a list of cards on the table, where table[0] is the
         top card, the player can choose a valid attacking card to play, or
         give up the attack. self.success must be set to True or False depending
-        on the player's action.
+        on the player's action. Returns the card the player chose,
+        Player.NO_VALID_MOVES, or Player.PASS_TURN as appropriate.
+        """
+        if self.verbose >= 1:
+            print "----ATTACK----"
+            print "  %s's hand: " % self.name, self.hand
+            print "  The table: ", table
+
+        if len(table) == 0:
+            i = self.beginAttack(trumpCard, deckSize, opponentHandSize, trashCards)
+            attackCard = self.hand.pop(i)
+            table.insert(0, attackCard)
+            self.success = True
+        else:
+            attackingOptions = self.getAttackingCards(table)
+            if len(attackingOptions) == 0:
+                self.success = False
+                if self.verbose >= 1:
+                    print "  %s cannot attack." % self.name
+                return Player.NO_VALID_MOVES
+
+            i = self.chooseAttackCard(attackingOptions, table, trumpCard,
+                                      deckSize, opponentHandSize, trashCards)
+            if i == -1:
+                self.success = False
+                if self.verbose >= 1:
+                    print "  %s gives up the attack." % self.name
+                return Player.PASS_TURN
+            attackCard = attackingOptions[i]
+            table.insert(0, attackCard)
+            self.hand.remove(attackCard)
+            self.success = True
+
+        if self.verbose >= 1:
+            print "  %s attacks with %s" % (self.name, attackCard)
+        return attackCard
+
+    def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
+        """
+        Returns an index from |self|.hand of the chosen card to begin attack.
         """
         raise NotImplementedError("Abstract function requires overriding")
 
-    def defend(self, table, trumpSuit):
+    def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        """
+        Returns an index from |options| of the chosen card for attacking (-1 to stop attacking).
+        """
+        raise NotImplementedError("Abstract function requires overriding")
+
+    def defend(self, table, trumpCard, deckSize, opponentHandSize, trashCards):
         """
         Given |table| a list of cards on the table, where table[0] is the top
         card, and |trumpSuit|, the player can choose a valid defending card
         to play, or surrender to the attacker. self.success must be set to
-        True or False depending on the player's action.
+        True or False depending on the player's action. Returns the card the
+        player chose, Player.NO_VALID_MOVES, or Player.PASS_TURN as appropriate.
+        """
+        if self.verbose >= 1:
+            print "----DEFEND----"
+            print "  %s's hand: " % self.name, self.hand
+            print "  The table: ", table
+
+        defendingOptions = self.getDefendingCards(table[0], trumpCard.suit)
+        if len(defendingOptions) == 0:
+            self.success = False
+            if self.verbose >= 1:
+                print "  %s cannot defend." % self.name
+            return Player.NO_VALID_MOVES
+
+        i = self.chooseDefenseCard(defendingOptions, table, trumpCard,
+                                   deckSize, opponentHandSize, trashCards)
+        if i == -1:
+            self.success = False
+            if self.verbose >= 1:
+                print "  %s surrenders." % self.name
+            return Player.PASS_TURN
+        table.insert(0, defendingOptions[i])
+        self.hand.remove(defendingOptions[i])
+        self.success = True
+
+        if self.verbose >= 1:
+            print "  %s defends with %s" % (self.name, defendingOptions[i])
+        return defendingOptions[i]
+
+    def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        """
+        Returns an index from |options| of the chosen card for defending (-1 to surrender).
         """
         raise NotImplementedError("Abstract function requires overriding")
 
@@ -63,7 +139,6 @@ class Player(object):
     def removeOpponentCard(self, card):
         try:
             self.opponentHand.remove(card)
-            self.numOpponentCards -= 1
         except ValueError:
             pass
 
@@ -73,7 +148,6 @@ class Player(object):
         """
         self.hand = []
         self.opponentHand = []
-        self.numOpponentCards = 6
 
 
 class HumanPlayer(Player):
@@ -85,69 +159,19 @@ class HumanPlayer(Player):
         super(HumanPlayer, self).__init__(verbose)
         self.rename()
 
-    def attack(self, table):
-        if self.verbose >= 1:
-            print "----ATTACK----"
-            print "  Your hand: ", self.hand
-            print "  The table: ", table
+    def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
+        return util.readIntegerInRange(0, len(self.hand),
+                                       "  Select a card to begin attack, %s: " % self.name)
 
-        if len(table) == 0:
-            i = util.readIntegerInRange(0, len(self.hand), 
-                                        "  Select a card to begin attack, %s: " % self.name)
-            attackCard = self.hand.pop(i)
-            table.insert(0, attackCard)
-            self.success = True
-        else:
-            attackingOptions = self.getAttackingCards(table)
-            if len(attackingOptions) == 0: 
-                if self.verbose >= 1: 
-                    print "  You cannot attack."
-                self.success = False
-                return Player.NO_VALID_MOVES
-            
-            print "  Attacking options: ", attackingOptions 
-            i = util.readIntegerInRange(-1, len(attackingOptions),
-                                        "  Select a card, %s (-1 to stop attack): " % self.name)
-            if i == -1: 
-                self.success = False
-                return Player.PASS_TURN
-            attackCard = attackingOptions[i]
-            table.insert(0, attackCard)
-            self.hand.remove(attackCard)
-            self.success = True
+    def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        print "  Attacking options: ", options
+        return util.readIntegerInRange(-1, len(options),
+                                       "  Select a card, %s (-1 to stop attack): " % self.name)
 
-        if self.verbose >= 2:
-            print "  Your hand: ", self.hand
-            print "  The table: ", table
-        return attackCard
-
-    def defend(self, table, trumpSuit):
-        if self.verbose >= 1:
-            print "----DEFEND----"
-            print "  Your hand: ", self.hand
-            print "  The table: ", table
-        
-        defendingOptions = self.getDefendingCards(table[0], trumpSuit)
-        if len(defendingOptions) == 0: 
-            if self.verbose >= 1:
-                print "  You cannot defend."
-            self.success = False
-            return Player.NO_VALID_MOVES
-
-        print "  Defending options: ", defendingOptions
-        i = util.readIntegerInRange(-1, len(defendingOptions),
-                                    "  Select a card, %s (-1 to surrender): " % self.name)
-        if i == -1:
-            self.success = False
-            return Player.PASS_TURN
-        table.insert(0, defendingOptions[i])
-        self.hand.remove(defendingOptions[i])
-        self.success = True
-         
-        if self.verbose >= 2:
-            print "  Your hand: ", self.hand
-            print "  The table: ", table
-        return defendingOptions[i]
+    def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        print "  Defending options: ", options
+        return util.readIntegerInRange(-1, len(options),
+                                       "  Select a card, %s (-1 to surrender): " % self.name)
 
     def rename(self):
         if self.verbose >= 1:
@@ -158,69 +182,15 @@ class HumanPlayer(Player):
             self.name = name
 
 
-class CPUPlayer(Player):
+class RandomCPUPlayer(Player):
     def __init__(self, verbose):
-        super(CPUPlayer, self).__init__(verbose)
+        super(RandomCPUPlayer, self).__init__(verbose)
 
-    def attack(self, table):
-        if self.verbose >= 1:
-            print "----ATTACK----"
-        if self.verbose >= 2:
-            print "  Your hand: ", self.hand
-            print "  The table: ", table
+    def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
+        return random.randint(0, len(self.hand) - 1)
 
-        if len(table) == 0:
-            i = random.randint(0, len(self.hand) - 1)
-            attackCard = self.hand.pop(i)
-            table.insert(0, attackCard)
-            self.success = True
-        else:
-            attackingOptions = self.getAttackingCards(table)
-            if len(attackingOptions) == 0: 
-                self.success = False
-                if self.verbose >= 1:
-                    print "  %s cannot attack." % self.name
-                return Player.NO_VALID_MOVES
-            
-            i = random.randint(-1, len(attackingOptions) - 1)
-            if i == -1: 
-                self.success = False
-                if self.verbose >= 1:
-                    print "  %s gives up the attack." % self.name
-                return Player.PASS_TURN
-            attackCard = attackingOptions[i]
-            table.insert(0, attackCard)
-            self.hand.remove(attackCard)
-            self.success = True
+    def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        return random.randint(-1, len(options) - 1)
 
-        if self.verbose >= 1:
-            print "  %s attacks with %s" % (self.name, attackCard)
-        return attackCard
-
-    def defend(self, table, trumpSuit):
-        if self.verbose >= 1:
-            print "----DEFEND----"
-        if self.verbose >= 2:
-            print "  Your hand: ", self.hand
-            print "  The table: ", table
-
-        defendingOptions = self.getDefendingCards(table[0], trumpSuit)
-        if len(defendingOptions) == 0: 
-            self.success = False
-            if self.verbose >= 1:
-                print "  %s cannot defend." % self.name
-            return Player.NO_VALID_MOVES
-
-        i = random.randint(-1, len(defendingOptions) - 1)
-        if i == -1:
-            self.success = False
-            if self.verbose >= 1:
-                print "  %s surrenders." % self.name
-            return Player.PASS_TURN
-        table.insert(0, defendingOptions[i])
-        self.hand.remove(defendingOptions[i])
-        self.success = True
-
-        if self.verbose >= 1:
-            print "  %s defends with %s" % (self.name, defendingOptions[i])
-        return defendingOptions[i]
+    def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        return random.randint(-1, len(options) - 1)

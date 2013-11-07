@@ -18,15 +18,19 @@ class Logger:
             'turns': []
         }
 
-    def recordMove(self, player, card, table):
+    def recordMove(self, player, opponent, card, table):
+        """
+        Given the chosen action |card| and the resulting state, recreates the state
+        before the action and writes the recreated state and action into memory.
+        """
         assert card is not None
         turnData = dict()
         turnData['player'] = int(player.name == self.players[1])  # 0 or 1
         turnData['opponentHand'] = [c.asDict() for c in player.opponentHand]
-        turnData['nOpponentCards'] = player.numOpponentCards
+        turnData['nOpponentCards'] = len(opponent.hand)
         if card not in [p.Player.NO_VALID_MOVES, p.Player.PASS_TURN]:
             turnData['card'] = card.asDict()
-            turnData['table'] = [c.asDict() for c in table[1:]]  # index 0 is player's move
+            turnData['table'] = [c.asDict() for c in table[1:]]  # table[0] == card
             turnData['hand'] = [c.asDict() for c in player.hand] + [card.asDict()]
         else:
             turnData['card'] = card

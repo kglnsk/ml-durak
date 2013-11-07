@@ -29,11 +29,12 @@ class Card:
 
 
 def parseArgs():
-    parser = argparse.ArgumentParser(description='Play a two-player game of Durak.')
+    parser = argparse.ArgumentParser(
+        description='Play a two-player game of Durak against a random-policy opponent.')
     parser.add_argument('-s', '--suits', type=int, default=4,
                         choices=[2, 3, 4], help="Number of suits to use")
-    parser.add_argument('-c', '--cpus', type=int, default=1,
-                        choices=[0, 1, 2], help="Number of computer players")
+    parser.add_argument('-p', '--player', type=str, default='random',
+                        choices=['human', 'random'], help="Player type")
     parser.add_argument('-v', '--verbose', type=int, default=1,
                         choices=[0, 1, 2], help="Verbosity of prompts")
     parser.add_argument('-n', '--numGames', type=int, default=1,
@@ -56,13 +57,12 @@ def getDeck(numSuits):
     return deck
 
 
-def getPlayers(numCPUs, verbosity):
-    if numCPUs == 0:
-        return player.HumanPlayer(verbosity), player.HumanPlayer(verbosity)
-    elif numCPUs == 1:
-        return player.HumanPlayer(verbosity), player.CPUPlayer(verbosity)
-    elif numCPUs == 2:
-        return player.CPUPlayer(verbosity), player.CPUPlayer(verbosity)
+def getPlayers(playerType, verbosity):
+    randomPlayer = player.RandomCPUPlayer(verbosity)
+    if playerType == 'random':
+        return player.RandomCPUPlayer(verbosity), randomPlayer
+    elif playerType == 'human':
+        return player.HumanPlayer(verbosity), randomPlayer
 
 
 def getPlayOrder(pOne, pTwo, trumpSuit):
@@ -101,22 +101,26 @@ def playGame(args, log, pOne, pTwo):
 
     trashCards = []
     while True:
-        if args.verbose == 2:
+        if args.verbose >= 1:
             print "\nTrump card: ", trumpCard
             print "Cards left: ", len(deck)
+        if args.verbose == 2:
             print "%s cards left: " % pOne.name, len(pOne.hand)
             print "%s cards left: " % pTwo.name, len(pTwo.hand)
 
         log.newRound(len(deck), trashCards)
         table = []
         while True:
-            attackCard = attacker.attack(table)
+            attackCard = attacker.attack(table, trumpCard, len(deck),
+                                         len(defender.hand), trashCards)
             defender.removeOpponentCard(attackCard)
-            log.recordMove(attacker, attackCard, table)
+            log.recordMove(attacker, defender, attackCard, table)
             if not attacker.success or len(attacker.hand) == 0: break
-            defendCard = defender.defend(table, trumpSuit)
+
+            defendCard = defender.defend(table, trumpCard, len(deck),
+                                         len(attacker.hand), trashCards)
             attacker.removeOpponentCard(defendCard)
-            log.recordMove(defender, defendCard, table)
+            log.recordMove(defender, attacker, defendCard, table)
             if not defender.success or len(defender.hand) == 0: break
 
         if len(deck) == 0 and (len(defender.hand) == 0 or len(attacker.hand) == 0):
@@ -143,13 +147,10 @@ def playGame(args, log, pOne, pTwo):
             defender.refillHand(deck)
             log.endRound(True)
 
-        attacker.numOpponentCards = len(defender.hand)
-        defender.numOpponentCards = len(attacker.hand)
-
     if len(defender.hand) == 0:
         if len(attacker.hand) == 1:
-            attackCard = attacker.attack(table)
-            log.recordMove(attacker, attackCard, table)
+            attackCard = attacker.attack(table, trumpCard, 0, 0, trashCards)
+            log.recordMove(attacker, defender, attackCard, table)
             if attacker.success:
                 if args.verbose >= 1:
                     print "Tie game!"
@@ -163,8 +164,8 @@ def playGame(args, log, pOne, pTwo):
         log.declareWinner(defender)
     elif len(attacker.hand) == 0:
         if len(defender.hand) == 1:
-            defendCard = defender.defend(table, trumpSuit)
-            log.recordMove(defender, defendCard, table)
+            defendCard = defender.defend(table, trumpCard, 0, 0, trashCards)
+            log.recordMove(defender, attacker, defendCard, table)
             if defender.success:
                 if args.verbose >= 1:
                     print "Tie game!"
@@ -180,7 +181,7 @@ def playGame(args, log, pOne, pTwo):
 
 def main():
     args = parseArgs()
-    pOne, pTwo = getPlayers(args.cpus, args.verbose)
+    pOne, pTwo = getPlayers(args.player, args.verbose)
     log = logger.Logger(pOne, pTwo)
     for i in range(args.numGames):
         playGame(args, log, pOne, pTwo)
