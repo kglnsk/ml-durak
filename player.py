@@ -3,11 +3,19 @@ import util
 
 
 class Player(object):
+    NO_VALID_MOVES = -1
+    PASS_TURN = -2
+
     def __init__(self, verbose):
         self.hand = []
         self.name = random.randint(0, 1000000)
         self.verbose = verbose
         self.wins = 0
+        self.isAttacker = False
+
+        # For card counting
+        self.opponentHand = []
+        self.numOpponentCards = 6
 
     def attack(self, table):
         """
@@ -27,10 +35,11 @@ class Player(object):
         """
         raise NotImplementedError("Abstract function requires overriding")
 
-    def refillHand(self, deck):
+    def refillHand(self, deck, sortHand=False):
         while len(self.hand) < 6 and len(deck) > 0:
             self.hand.append(deck.pop())
-        self.hand.sort(key=lambda c: (c.suit, c.rank))
+        if sortHand:
+            self.hand.sort(key=lambda c: (c.suit, c.rank))
     
     def getAttackingCards(self, table):
         """
@@ -50,7 +59,22 @@ class Player(object):
         if aCard.suit != trumpSuit:
             cards.extend(filter(lambda c: c.suit == trumpSuit, self.hand))
         return cards
-    
+
+    def removeOpponentCard(self, card):
+        try:
+            self.opponentHand.remove(card)
+            self.numOpponentCards -= 1
+        except ValueError:
+            pass
+
+    def reset(self):
+        """
+        Resets the game state in preparation for a new game.
+        """
+        self.hand = []
+        self.opponentHand = []
+        self.numOpponentCards = 6
+
 
 class HumanPlayer(Player):
     """
@@ -70,7 +94,8 @@ class HumanPlayer(Player):
         if len(table) == 0:
             i = util.readIntegerInRange(0, len(self.hand), 
                                         "  Select a card to begin attack, %s: " % self.name)
-            table.insert(0, self.hand.pop(i))
+            attackCard = self.hand.pop(i)
+            table.insert(0, attackCard)
             self.success = True
         else:
             attackingOptions = self.getAttackingCards(table)
@@ -78,21 +103,23 @@ class HumanPlayer(Player):
                 if self.verbose >= 1: 
                     print "  You cannot attack."
                 self.success = False
-                return
+                return Player.NO_VALID_MOVES
             
             print "  Attacking options: ", attackingOptions 
             i = util.readIntegerInRange(-1, len(attackingOptions),
                                         "  Select a card, %s (-1 to stop attack): " % self.name)
             if i == -1: 
                 self.success = False
-                return
-            table.insert(0, attackingOptions[i])
-            self.hand.remove(attackingOptions[i])
+                return Player.PASS_TURN
+            attackCard = attackingOptions[i]
+            table.insert(0, attackCard)
+            self.hand.remove(attackCard)
             self.success = True
 
         if self.verbose >= 2:
             print "  Your hand: ", self.hand
             print "  The table: ", table
+        return attackCard
 
     def defend(self, table, trumpSuit):
         if self.verbose >= 1:
@@ -105,14 +132,14 @@ class HumanPlayer(Player):
             if self.verbose >= 1:
                 print "  You cannot defend."
             self.success = False
-            return
+            return Player.NO_VALID_MOVES
 
         print "  Defending options: ", defendingOptions
         i = util.readIntegerInRange(-1, len(defendingOptions),
                                     "  Select a card, %s (-1 to surrender): " % self.name)
         if i == -1:
             self.success = False
-            return
+            return Player.PASS_TURN
         table.insert(0, defendingOptions[i])
         self.hand.remove(defendingOptions[i])
         self.success = True
@@ -120,6 +147,7 @@ class HumanPlayer(Player):
         if self.verbose >= 2:
             print "  Your hand: ", self.hand
             print "  The table: ", table
+        return defendingOptions[i]
 
     def rename(self):
         if self.verbose >= 1:
@@ -152,14 +180,14 @@ class CPUPlayer(Player):
                 self.success = False
                 if self.verbose >= 1:
                     print "  %s cannot attack." % self.name
-                return
+                return Player.NO_VALID_MOVES
             
             i = random.randint(-1, len(attackingOptions) - 1)
             if i == -1: 
                 self.success = False
                 if self.verbose >= 1:
                     print "  %s gives up the attack." % self.name
-                return
+                return Player.PASS_TURN
             attackCard = attackingOptions[i]
             table.insert(0, attackCard)
             self.hand.remove(attackCard)
@@ -167,6 +195,7 @@ class CPUPlayer(Player):
 
         if self.verbose >= 1:
             print "  %s attacks with %s" % (self.name, attackCard)
+        return attackCard
 
     def defend(self, table, trumpSuit):
         if self.verbose >= 1:
@@ -180,17 +209,18 @@ class CPUPlayer(Player):
             self.success = False
             if self.verbose >= 1:
                 print "  %s cannot defend." % self.name
-            return
+            return Player.NO_VALID_MOVES
 
         i = random.randint(-1, len(defendingOptions) - 1)
         if i == -1:
             self.success = False
             if self.verbose >= 1:
                 print "  %s surrenders." % self.name
-            return
+            return Player.PASS_TURN
         table.insert(0, defendingOptions[i])
         self.hand.remove(defendingOptions[i])
         self.success = True
 
         if self.verbose >= 1:
             print "  %s defends with %s" % (self.name, defendingOptions[i])
+        return defendingOptions[i]
