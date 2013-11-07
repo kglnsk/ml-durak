@@ -1,11 +1,13 @@
 import random
 import util
 
+
 class Player(object):
     def __init__(self, verbose):
         self.hand = []
         self.name = random.randint(0, 1000000)
         self.verbose = verbose
+        self.wins = 0
 
     def attack(self, table):
         """
@@ -44,8 +46,7 @@ class Player(object):
         but of higher rank. If the attacking card is not a trump card, any trump
         cards are also valid attacking cards.
         """
-        cards = filter(lambda c: c.suit == aCard.suit and c.rank > aCard.rank,
-                       self.hand)
+        cards = filter(lambda c: c.suit == aCard.suit and c.rank > aCard.rank, self.hand)
         if aCard.suit != trumpSuit:
             cards.extend(filter(lambda c: c.suit == trumpSuit, self.hand))
         return cards
@@ -125,7 +126,8 @@ class HumanPlayer(Player):
             print "Player %s, what would you like to call yourself?" % self.name
 
         name = raw_input()
-        if name != '': self.name = name
+        if name != '':
+            self.name = name
 
 
 class CPUPlayer(Player):
@@ -135,6 +137,9 @@ class CPUPlayer(Player):
     def attack(self, table):
         if self.verbose >= 1:
             print "----ATTACK----"
+        if self.verbose >= 2:
+            print "  Your hand: ", self.hand
+            print "  The table: ", table
 
         if len(table) == 0:
             i = random.randint(0, len(self.hand) - 1)
@@ -145,37 +150,47 @@ class CPUPlayer(Player):
             attackingOptions = self.getAttackingCards(table)
             if len(attackingOptions) == 0: 
                 self.success = False
-                print "  %s cannot attack." % self.name
+                if self.verbose >= 1:
+                    print "  %s cannot attack." % self.name
                 return
             
             i = random.randint(-1, len(attackingOptions) - 1)
             if i == -1: 
                 self.success = False
-                print "  %s gives up the attack." % self.name
+                if self.verbose >= 1:
+                    print "  %s gives up the attack." % self.name
                 return
             attackCard = attackingOptions[i]
             table.insert(0, attackCard)
             self.hand.remove(attackCard)
             self.success = True
-        print "  %s attacks with %s" % (self.name, attackCard)
+
+        if self.verbose >= 1:
+            print "  %s attacks with %s" % (self.name, attackCard)
 
     def defend(self, table, trumpSuit):
         if self.verbose >= 1:
             print "----DEFEND----"
+        if self.verbose >= 2:
+            print "  Your hand: ", self.hand
+            print "  The table: ", table
 
         defendingOptions = self.getDefendingCards(table[0], trumpSuit)
         if len(defendingOptions) == 0: 
             self.success = False
-            print "  %s cannot defend." % self.name
+            if self.verbose >= 1:
+                print "  %s cannot defend." % self.name
             return
 
         i = random.randint(-1, len(defendingOptions) - 1)
         if i == -1:
             self.success = False
-            print "  %s surrenders." % self.name
+            if self.verbose >= 1:
+                print "  %s surrenders." % self.name
             return
         table.insert(0, defendingOptions[i])
         self.hand.remove(defendingOptions[i])
         self.success = True
-        print "  %s defends with %s" % (self.name, defendingOptions[i])
 
+        if self.verbose >= 1:
+            print "  %s defends with %s" % (self.name, defendingOptions[i])
