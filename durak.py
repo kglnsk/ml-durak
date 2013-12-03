@@ -33,13 +33,13 @@ def parseArgs():
         description='Play a two-player game of Durak against a random-policy opponent.')
     parser.add_argument('-s', '--suits', type=int, default=4,
                         choices=[2, 3, 4], help="Number of suits to use")
-    parser.add_argument('-p', '--player', type=str, default='random',
-                        choices=['human', 'random'], help="Player type")
+    parser.add_argument('-p', '--player', type=str, default='simple',
+                        choices=['human', 'random', 'simple'], help="Player type")
     parser.add_argument('-v', '--verbose', type=int, default=1,
                         choices=[0, 1, 2], help="Verbosity of prompts")
     parser.add_argument('-n', '--numGames', type=int, default=1,
                         help="Number of games to play")
-    parser.add_argument('logFile', help="Where to save the game log file")
+    parser.add_argument('-l', '--logFile', help="Where to save the game log file")
     return parser.parse_args()
 
 
@@ -58,11 +58,13 @@ def getDeck(numSuits):
 
 
 def getPlayers(playerType, verbosity):
-    randomPlayer = player.RandomCPUPlayer(verbosity)
+    baselinePlayer = player.SimpleCPUPlayer(verbosity)
     if playerType == 'random':
-        return player.RandomCPUPlayer(verbosity), randomPlayer
+        return player.RandomCPUPlayer(verbosity), baselinePlayer
     elif playerType == 'human':
-        return player.HumanPlayer(verbosity), randomPlayer
+        return player.HumanPlayer(verbosity), baselinePlayer
+    elif playerType == 'simple':
+        return player.SimpleCPUPlayer(verbosity), baselinePlayer
 
 
 def getPlayOrder(pOne, pTwo, trumpSuit):
@@ -99,6 +101,7 @@ def playGame(args, log, pOne, pTwo):
     attacker.isAttacker = True
     defender.isAttacker = False
 
+    table = []
     trashCards = []
     while True:
         if args.verbose >= 1:
@@ -109,7 +112,6 @@ def playGame(args, log, pOne, pTwo):
             print "%s cards left: " % pTwo.name, len(pTwo.hand)
 
         log.newRound(len(deck), trashCards)
-        table = []
         while True:
             attackCard = attacker.attack(table, trumpCard, len(deck),
                                          len(defender.hand), trashCards)
@@ -133,10 +135,7 @@ def playGame(args, log, pOne, pTwo):
             attacker.refillHand(deck)
             defender.refillHand(deck)
             log.endRound(False)
-
             attacker, defender = defender, attacker
-            attacker.isAttacker = True
-            defender.isAttacker = False
         elif (attacker.success and not defender.success) or len(attacker.hand) == 0:
             if args.verbose >= 1:
                 print "%s wins the round and remains the attacker." % attacker.name
@@ -147,6 +146,13 @@ def playGame(args, log, pOne, pTwo):
             defender.refillHand(deck)
             log.endRound(True)
 
+        # Edge case: last round, the defender ran out of cards & the attacker got under
+        # 6 cards. The attacker took the rest of the deck, so the defender (new attacker)
+        # has 0 cards in his hand.
+        if len(deck) == 0 and len(attacker.hand) == 0:
+            break
+        table = []
+
     if len(defender.hand) == 0:
         if len(attacker.hand) == 1:
             attackCard = attacker.attack(table, trumpCard, 0, 0, trashCards)
@@ -156,12 +162,12 @@ def playGame(args, log, pOne, pTwo):
                     print "Tie game!"
                 log.endRound(True)
                 log.declareTie()
-                return
-        if args.verbose >= 1:
-            print "%s wins!" % defender.name
-        log.endRound(False)
-        defender.wins += 1
-        log.declareWinner(defender)
+        else:
+            if args.verbose >= 1:
+                print "%s wins!" % defender.name
+            log.endRound(False)
+            defender.wins += 1
+            log.declareWinner(defender)
     elif len(attacker.hand) == 0:
         if len(defender.hand) == 1:
             defendCard = defender.defend(table, trumpCard, 0, 0, trashCards)
@@ -171,12 +177,12 @@ def playGame(args, log, pOne, pTwo):
                     print "Tie game!"
                 log.endRound(False)
                 log.declareTie()
-                return
-        if args.verbose >= 1:
-            print "%s wins!" % attacker.name
-        log.endRound(True)
-        attacker.wins += 1
-        log.declareWinner(attacker)
+        else:
+            if args.verbose >= 1:
+                print "%s wins!" % attacker.name
+            log.endRound(True)
+            attacker.wins += 1
+            log.declareWinner(attacker)
 
 
 def main():
@@ -189,7 +195,9 @@ def main():
         pTwo.reset()
     print "%s wins: %d / %d" % (pOne.name, pOne.wins, args.numGames)
     print "%s wins: %d / %d" % (pTwo.name, pTwo.wins, args.numGames)
-    log.write(args.logFile, pretty=True)
+
+    if args.logFile:
+        log.write(args.logFile, pretty=True)
 
 if __name__ == '__main__':
     main()

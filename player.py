@@ -11,7 +11,6 @@ class Player(object):
         self.name = random.randint(0, 1000000)
         self.verbose = verbose
         self.wins = 0
-        self.isAttacker = False
 
         # For card counting
         self.opponentHand = []
@@ -156,7 +155,7 @@ class HumanPlayer(Player):
     of the card s/he wants to play.
     """
     def __init__(self, verbose):
-        super(HumanPlayer, self).__init__(verbose)
+        super(self.__class__, self).__init__(verbose)
         self.rename()
 
     def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
@@ -184,7 +183,7 @@ class HumanPlayer(Player):
 
 class RandomCPUPlayer(Player):
     def __init__(self, verbose):
-        super(RandomCPUPlayer, self).__init__(verbose)
+        super(self.__class__, self).__init__(verbose)
 
     def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
         return random.randint(0, len(self.hand) - 1)
@@ -194,3 +193,31 @@ class RandomCPUPlayer(Player):
 
     def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
         return random.randint(-1, len(options) - 1)
+
+
+class SimpleCPUPlayer(Player):
+    """
+    SimpleCPUPlayer always follows the policy of choosing the lowest-ranked non-trump
+    card first. When there are no non-trump cards, SimpleCPUPlayer then chooses the
+    lowest-ranked trump card available.
+    """
+    def __init__(self, verbose):
+        super(self.__class__, self).__init__(verbose)
+
+    def policy(self, options, trumpSuit):
+        sortedOptions = sorted(options, key=lambda c: c.rank)
+        nonTrumpCards = filter(lambda c: c.suit != trumpSuit, sortedOptions)
+        trumpCards = filter(lambda c: c.suit == trumpSuit, sortedOptions)
+        if len(nonTrumpCards) > 0:
+            return options.index(nonTrumpCards[0])
+        elif len(trumpCards) > 0:
+            return options.index(trumpCards[0])
+
+    def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
+        return self.policy(self.hand, trumpCard.suit)
+
+    def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        return self.policy(options, trumpCard.suit)
+
+    def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        return self.policy(options, trumpCard.suit)
