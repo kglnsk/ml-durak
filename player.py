@@ -1,5 +1,10 @@
+import durak
+
+import math
 import random
 import util
+import copy
+import pickle
 
 
 class Player(object):
@@ -14,6 +19,7 @@ class Player(object):
 
         # For card counting
         self.opponentHand = []
+        self.maxCards = [max(durak.Card.RANKS) for _ in durak.Card.SUITS]
 
     def attack(self, table, trumpCard, deckSize, opponentHandSize, trashCards):
         """
@@ -30,9 +36,7 @@ class Player(object):
 
         if len(table) == 0:
             i = self.beginAttack(trumpCard, deckSize, opponentHandSize, trashCards)
-            attackCard = self.hand.pop(i)
-            table.insert(0, attackCard)
-            self.success = True
+            attackCard = self.hand[i]
         else:
             attackingOptions = self.getAttackingCards(table)
             if len(attackingOptions) == 0:
@@ -49,10 +53,12 @@ class Player(object):
                     print "  %s gives up the attack." % self.name
                 return Player.PASS_TURN
             attackCard = attackingOptions[i]
-            table.insert(0, attackCard)
-            self.hand.remove(attackCard)
-            self.success = True
 
+        table.insert(0, attackCard)
+        self.hand.remove(attackCard)
+        if attackCard.rank == self.maxCards[attackCard.suit]:
+            self.maxCards[attackCard.suit] -= 1
+        self.success = True
         if self.verbose >= 1:
             print "  %s attacks with %s" % (self.name, attackCard)
         return attackCard
@@ -96,10 +102,12 @@ class Player(object):
             if self.verbose >= 1:
                 print "  %s surrenders." % self.name
             return Player.PASS_TURN
+
         table.insert(0, defendingOptions[i])
         self.hand.remove(defendingOptions[i])
+        if defendingOptions[i].rank == self.maxCards[defendingOptions[i].suit]:
+            self.maxCards[defendingOptions[i].suit] -= 1
         self.success = True
-
         if self.verbose >= 1:
             print "  %s defends with %s" % (self.name, defendingOptions[i])
         return defendingOptions[i]
@@ -136,10 +144,29 @@ class Player(object):
         return cards
 
     def removeOpponentCard(self, card):
+        if not isinstance(card, durak.Card): return
+
         try:
             self.opponentHand.remove(card)
         except ValueError:
             pass
+
+        if card.rank == self.maxCards[card.suit]:
+            self.maxCards[card.suit] -= 1
+
+    def addCards(self, table):
+        self.hand.extend(table)
+
+        for card in table:
+            if card.rank > self.maxCards[card.suit]:
+                self.maxCards[card.suit] = card.rank
+
+    def addOpponentCards(self, table):
+        self.opponentHand.extend(table)
+
+        for card in table:
+            if card.rank > self.maxCards[card.suit]:
+                self.maxCards[card.suit] = card.rank
 
     def reset(self):
         """
@@ -221,3 +248,107 @@ class SimpleCPUPlayer(Player):
 
     def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
         return self.policy(options, trumpCard.suit)
+
+
+FULL_DECK = durak.getDeck(shuffle=False)
+
+
+def avgRank(cards):
+    rankSum = sum(c.rank for c in cards)
+    if len(cards) == 0:
+        return 0
+    else:
+        return float(rankSum) / len(cards)
+
+
+def extractFeatures(hand, opponentHand, opponentHandSize,
+                    trumpCard, table, deckSize, trashCards):
+    features = [len(hand), len(table), deckSize]
+    for rank in durak.Card.RANKS:
+        rankCards = filter(lambda c: c.rank == rank, hand)
+        features.append(len(rankCards))
+    royals = filter(lambda c: c.rank > 10, hand)
+
+    clubs = filter(lambda c: c.suit == 0, hand)
+    hearts = filter(lambda c: c.suit == 1, hand)
+    diamonds = filter(lambda c: c.suit == 2, hand)
+    spades = filter(lambda c: c.suit == 3, hand)
+    trumps = filter(lambda c: c.suit == trumpCard.suit, hand)
+
+    # tableRanks = set([c.rank for c in table])
+    # validCards = set(FULL_DECK) - set(trashCards)
+
+    return features + [len(royals), len(clubs), len(hearts), len(diamonds), len(spades), len(trumps),
+                       avgRank(clubs), avgRank(hearts), avgRank(diamonds), avgRank(spades), avgRank(trumps)]
+
+
+class ReflexCPUPlayer(Player):
+    attackWeights = [random.gauss(0, 1e-2) for _ in range(23)]
+    defendWeights = [random.gauss(0, 1e-2) for _ in range(23)]
+
+    def __init__(self, verbose):
+        super(self.__class__, self).__init__(verbose)
+
+    def chooseAction(self, opts, table, trumpCard, deckSize, opponentHandSize, trashCards, weights):
+        maxV = None
+        maxI = None
+        for i, card in enumerate(opts):
+            newHand = copy.deepcopy(self.hand)
+            newHand.remove(card)
+            features = extractFeatures(newHand, self.opponentHand, opponentHandSize,
+                                       trumpCard, table + [card], deckSize, trashCards)
+            z = sum(w * feature for w, feature in zip(weights, features))
+            v = 1.0 / (1 + math.exp(-z))
+            if maxV is None or v > maxV:
+                maxV = v
+                maxI = i
+        return maxI, maxV
+
+    def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
+        maxI, maxV = self.chooseAction(self.hand, [], trumpCard, deckSize,
+                                       opponentHandSize, trashCards, self.attackWeights)
+        return maxI
+
+    def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        maxI, maxV = self.chooseAction(options, table, trumpCard, deckSize,
+                                       opponentHandSize, trashCards, self.attackWeights)
+        stopFeatures = extractFeatures(self.hand, self.opponentHand, opponentHandSize,
+                                       trumpCard, [], deckSize, trashCards + table)
+        stopZ = sum(w * feature for w, feature in zip(self.attackWeights, stopFeatures))
+        stopV = 1.0 / (1 + math.exp(-stopZ))
+        if stopV > maxV:
+            return -1
+        else:
+            return maxI
+
+    def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
+        maxI, maxV = self.chooseAction(options, table, trumpCard, deckSize,
+                                       opponentHandSize, trashCards, self.defendWeights)
+        stopFeatures = extractFeatures(self.hand + table, self.opponentHand, opponentHandSize,
+                                       trumpCard, [], deckSize, trashCards)
+        stopZ = sum(w * feature for w, feature in zip(self.defendWeights, stopFeatures))
+        stopV = 1.0 / (1 + math.exp(-stopZ))
+        if stopV > maxV:
+            return -1
+        else:
+            return maxI
+
+    @staticmethod
+    def writeWeights():
+        with open('reflex_attack', 'w') as f:
+            pickle.dump(ReflexCPUPlayer.attackWeights, f)
+        with open('reflex_defend', 'w') as f:
+            pickle.dump(ReflexCPUPlayer.defendWeights, f)
+
+    @staticmethod
+    def loadWeights():
+        try:
+            with open('reflex_attack', 'r') as f:
+                ReflexCPUPlayer.attackWeights = pickle.load(f)
+        except IOError:
+            ReflexCPUPlayer.attackWeights = [random.gauss(0, 1e-2) for _ in range(23)]
+        try:
+            with open('reflex_defend', 'r') as f:
+                ReflexCPUPlayer.defendWeights = pickle.load(f)
+        except IOError:
+            ReflexCPUPlayer.defendWeights = [random.gauss(0, 1e-2) for _ in range(23)]

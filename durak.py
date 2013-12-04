@@ -13,7 +13,16 @@ class Card:
     def __init__(self, suit, rank):
         self.rank = rank
         self.suit = suit
-    
+
+    def __eq__(self, other):
+        return \
+            isinstance(other, self.__class__) and \
+            self.rank == other.rank and \
+            self.suit == other.suit
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __repr__(self):
         rankString = Card.ROYALS.get(self.rank, str(self.rank))
         suitString = Card.SUITS[self.suit]
@@ -31,10 +40,8 @@ class Card:
 def parseArgs():
     parser = argparse.ArgumentParser(
         description='Play a two-player game of Durak against a random-policy opponent.')
-    parser.add_argument('-s', '--suits', type=int, default=4,
-                        choices=[2, 3, 4], help="Number of suits to use")
     parser.add_argument('-p', '--player', type=str, default='simple',
-                        choices=['human', 'random', 'simple'], help="Player type")
+                        choices=['human', 'random', 'simple', 'reflex'], help="Player type")
     parser.add_argument('-v', '--verbose', type=int, default=1,
                         choices=[0, 1, 2], help="Verbosity of prompts")
     parser.add_argument('-n', '--numGames', type=int, default=1,
@@ -43,17 +50,17 @@ def parseArgs():
     return parser.parse_args()
 
 
-def getDeck(numSuits):
+def getDeck(shuffle=True):
     """
     Returns a shuffled deck of Durak cards, using |numSuits| different suits.
     Index 0 is the bottom of the deck, and index -1 is the top of the deck.
     """
-    suits = Card.SUITS.keys()[:numSuits]
     
     deck = []
-    for suit, rank in product(suits, Card.RANKS):
+    for suit, rank in product(Card.SUITS, Card.RANKS):
         deck.append(Card(suit, rank))
-    random.shuffle(deck)
+    if shuffle:
+        random.shuffle(deck)
     return deck
 
 
@@ -65,6 +72,8 @@ def getPlayers(playerType, verbosity):
         return player.HumanPlayer(verbosity), baselinePlayer
     elif playerType == 'simple':
         return player.SimpleCPUPlayer(verbosity), baselinePlayer
+    elif playerType == 'reflex':
+        return player.ReflexCPUPlayer(verbosity), baselinePlayer
 
 
 def getPlayOrder(pOne, pTwo, trumpSuit):
@@ -89,7 +98,7 @@ def getPlayOrder(pOne, pTwo, trumpSuit):
 
 
 def playGame(args, log, pOne, pTwo):
-    deck = getDeck(args.suits)
+    deck = getDeck()
     trumpCard = deck.pop() 
     trumpSuit = trumpCard.suit
     deck.insert(0, trumpCard)
@@ -139,8 +148,8 @@ def playGame(args, log, pOne, pTwo):
         elif (attacker.success and not defender.success) or len(attacker.hand) == 0:
             if args.verbose >= 1:
                 print "%s wins the round and remains the attacker." % attacker.name
-            attacker.opponentHand.extend(table)
-            defender.hand.extend(table)
+            attacker.addOpponentCards(table)
+            defender.addCards(table)
             # TODO option for attacker to give additional cards
             attacker.refillHand(deck)
             defender.refillHand(deck)
@@ -187,6 +196,8 @@ def playGame(args, log, pOne, pTwo):
 
 def main():
     args = parseArgs()
+    player.ReflexCPUPlayer.loadWeights()
+
     pOne, pTwo = getPlayers(args.player, args.verbose)
     log = logger.Logger(pOne, pTwo)
     for i in range(args.numGames):
@@ -198,6 +209,7 @@ def main():
 
     if args.logFile:
         log.write(args.logFile, pretty=True)
+    player.ReflexCPUPlayer.writeWeights()
 
 if __name__ == '__main__':
     main()
