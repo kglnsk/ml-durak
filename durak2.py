@@ -71,7 +71,7 @@ class CardSet(object):
 
     def addCard(self, card):
         if not isinstance(card, Card):
-            raise TypeError
+            raise TypeError('Tried to add something other than a Card to a CardSet')
 
         self.groupedByRank[card.rank].add(card)
         self.groupedBySuit[card.suit].add(card)
@@ -83,7 +83,7 @@ class CardSet(object):
 
     def removeCard(self, card):
         if not isinstance(card, Card):
-            raise TypeError
+            raise TypeError('Tried to add something other than a Card to a CardSet')
 
         try:
             self.groupedByRank[card.rank].remove(card)
@@ -140,7 +140,7 @@ class Durak:
 
     def newGame(self):
         self.hand = [CardSet(), CardSet()]
-        self.opponentHand = [CardSet(), CardSet()]  # for card counting
+        self.predictedHand = [CardSet(), CardSet()]  # for card counting
         self.deck = Card.getDeck()
         self.table = Table()
         self.trash = CardSet()
@@ -174,17 +174,26 @@ class Durak:
         return self.attacker
 
     def getAttackOptions(self, player):
+        """
+        For a given player, returns a list of valid attacking options based on the game state.
+        If ending the round is an option, it is the last option in the list.
+        """
         if len(self.table.getSeenRanks()) == 0:
             cards = []
             for rank in Card.RANKS:
                 cards.extend(self.hand[player].getCardsForRank(rank))
         else:
-            cards = [Durak.END_ROUND]
+            cards = []
             for rank in self.table.getSeenRanks():
                 cards.extend(self.hand[player].getCardsForRank(rank))
+            cards.append(Durak.END_ROUND)
         return cards
 
     def getDefendOptions(self, player):
+        """
+        For a given player, returns a list of valid defending options based on the game state.
+        Ending the round is always the last option in the list.
+        """
         topCard = self.table.getTopCard()
         cards = filter(lambda c: c.rank > topCard.rank,
                        self.hand[player].getCardsForSuit(topCard.suit))
@@ -194,13 +203,18 @@ class Durak:
         return cards
 
     def playCard(self, player, card):
+        if self.winner is not None:
+            raise Exception('Tried to play a card for a finished game')
+        if self.roundWinner is not None:
+            raise Exception('Tried to play a card for a finished round')
+
         opponent = int(not player)
         if card == Durak.END_ROUND:
             self.roundWinner = opponent
             return
 
         self.hand[player].removeCard(card)
-        self.opponentHand[opponent].removeCard(card)
+        self.predictedHand[player].removeCard(card)
         self.table.addCard(card)
 
         if len(self.hand[player]) == 0:
@@ -217,10 +231,13 @@ class Durak:
             self.hand[defender].addCard(self.deck.pop(0))
 
     def endRound(self):
+        if self.roundWinner is None:
+            raise Exception('Tried to end a round that is not yet over')
+
         defender = int(not self.attacker)
         if self.attacker == self.roundWinner:
             self.hand[defender].addCards(self.table.getCards())
-            self.opponentHand[self.attacker].addCards(self.table.getCards())
+            self.predictedHand[defender].addCards(self.table.getCards())
         else:
             self.trash.addCards(self.table.getCards())
 

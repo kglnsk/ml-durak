@@ -27,14 +27,14 @@ class HumanAgent(Agent):
 
     def getAttackCard(self, cards, game):
         self.printInfo(game)
-        if dk.Durak.END_ROUND not in cards:
+        if cards[-1] != dk.Durak.END_ROUND:
             print 'Your options: ', cards
             index = util.readIntegerInRange(0, len(cards),
                                             'Select a card to begin attack: ')
         else:
             cards.remove(dk.Durak.END_ROUND)
             print 'Your options: ', cards
-            index = util.readIntegerInRange(-1, len(cards),
+            index = util.readIntegerInRange(-1, len(cards) - 1,
                                             'Select a card to attack (-1 to stop): ')
 
         if index == -1:
@@ -44,9 +44,8 @@ class HumanAgent(Agent):
 
     def getDefendCard(self, cards, game):
         self.printInfo(game)
-        cards.remove(dk.Durak.END_ROUND)
         print 'Your options: ', cards
-        index = util.readIntegerInRange(-1, len(cards),
+        index = util.readIntegerInRange(-1, len(cards) - 1,
                                         'Select a card to defend (-1 to surrender): ')
         if index == -1:
             return dk.Durak.END_ROUND
@@ -64,9 +63,11 @@ class RandomAgent(Agent):
 
 class SimpleAgent(Agent):
     def policy(self, cards, trumpSuit):
+        if cards[-1] == dk.Durak.END_ROUND:
+            cards = cards[:-1]
         sortedCards = sorted(cards, key=lambda c: c.rank)
         trumpCards = filter(lambda c: c.suit == trumpSuit, sortedCards)
-        nonTrumpCards = filter(lambda c: c.suit != trumpSuit and c.suit != -1, sortedCards)
+        nonTrumpCards = filter(lambda c: c.suit != trumpSuit, sortedCards)
         if len(nonTrumpCards) > 0:
             return nonTrumpCards[0]
         elif len(trumpCards) > 0:
@@ -87,7 +88,7 @@ def logisticValue(weights, features):
 
 
 class ReflexAgent(Agent):
-    def __init__(self, atkWeights, defWeights):
+    def setWeights(self, atkWeights, defWeights):
         self.w_atk = atkWeights
         self.w_def = defWeights
 
