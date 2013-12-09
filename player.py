@@ -20,6 +20,7 @@ class Player(object):
         # For card counting
         self.opponentHand = []
         self.maxCards = [max(durak.Card.RANKS) for _ in durak.Card.SUITS]
+        self.unseenCards = set(durak.getDeck())
 
     def attack(self, table, trumpCard, deckSize, opponentHandSize, trashCards):
         """
@@ -120,7 +121,9 @@ class Player(object):
 
     def refillHand(self, deck, sortHand=False):
         while len(self.hand) < 6 and len(deck) > 0:
-            self.hand.append(deck.pop())
+            card = deck.pop()
+            self.hand.append(card)
+            self.unseenCards.discard(card)
         if sortHand:
             self.hand.sort(key=lambda c: (c.suit, c.rank))
     
@@ -153,6 +156,7 @@ class Player(object):
 
         if card.rank == self.maxCards[card.suit]:
             self.maxCards[card.suit] -= 1
+        self.unseenCards.discard(card)
 
     def addCards(self, table):
         self.hand.extend(table)
@@ -167,6 +171,12 @@ class Player(object):
         for card in table:
             if card.rank > self.maxCards[card.suit]:
                 self.maxCards[card.suit] = card.rank
+
+    def TDUpdateAttack(self, state, newState, reward):
+        pass
+
+    def TDUpdateDefend(self, state, newState, reward):
+        pass
 
     def reset(self):
         """
@@ -262,8 +272,8 @@ def avgRank(cards):
 
 
 def extractFeatures(hand, opponentHand, opponentHandSize,
-                    trumpCard, table, deckSize, trashCards):
-    features = [len(hand), len(table), deckSize]
+                    trumpCard, table, deckSize, unseenCards):
+    features = [len(hand), len(table), deckSize, opponentHandSize]
     for rank in durak.Card.RANKS:
         rankCards = filter(lambda c: c.rank == rank, hand)
         features.append(len(rankCards))
@@ -275,30 +285,58 @@ def extractFeatures(hand, opponentHand, opponentHandSize,
     spades = filter(lambda c: c.suit == 3, hand)
     trumps = filter(lambda c: c.suit == trumpCard.suit, hand)
 
-    # tableRanks = set([c.rank for c in table])
-    # validCards = set(FULL_DECK) - set(trashCards)
+    tableRanks = set([c.rank for c in table])
+    attackCards = filter(lambda c: c.rank in tableRanks, hand)
+    if len(tableRanks) > 0:
+        defendCards = filter(lambda c: c.rank > max(tableRanks) or c.suit == trumpCard.suit, hand)
+    else:
+        defendCards = hand
+
+    # cards we know the opponent has
+    oppAttackCards = filter(lambda c: c.rank in tableRanks, opponentHand)
+    expAttackCards = len(oppAttackCards)
+    if len(tableRanks) > 0:
+        oppDefendCards = filter(lambda c: c.rank > max(tableRanks) or c.suit == trumpCard.suit, opponentHand)
+    else:
+        oppDefendCards = opponentHand
+    expDefendCards = len(oppDefendCards)
+
+    # model expectation using hypergeometric distribution
+    # if len(unseenCards) > 0:
+    #     nUnknownCards = opponentHandSize - len(opponentHand)
+    #     nAttackCards = len(filter(lambda c: c.rank in tableRanks, unseenCards))
+    #     expAttackCards += nUnknownCards * nAttackCards / float(len(unseenCards))
+    #     if len(tableRanks) > 0:
+    #         nDefendCards = len(filter(lambda c: c.rank > min(tableRanks) or
+    #                                             c.suit == trumpCard.suit, unseenCards))
+    #         expDefendCards += nUnknownCards * nDefendCards / float(len(unseenCards))
 
     return features + [len(royals), len(clubs), len(hearts), len(diamonds), len(spades), len(trumps),
-                       avgRank(clubs), avgRank(hearts), avgRank(diamonds), avgRank(spades), avgRank(trumps)]
+                       avgRank(clubs), avgRank(hearts), avgRank(diamonds), avgRank(spades), avgRank(trumps),
+                       len(attackCards), len(defendCards), len(tableRanks), expAttackCards, expDefendCards]
+
+
+def logisticValue(weights, features):
+    z = sum(weight * feature for weight, feature in zip(weights, features))
+    return 1.0 / (1 + math.exp(-z))
 
 
 class ReflexCPUPlayer(Player):
-    attackWeights = [random.gauss(0, 1e-2) for _ in range(23)]
-    defendWeights = [random.gauss(0, 1e-2) for _ in range(23)]
+    attackWeights = [random.gauss(0, 1e-2) for _ in range(29)]
+    defendWeights = [random.gauss(0, 1e-2) for _ in range(29)]
 
     def __init__(self, verbose):
         super(self.__class__, self).__init__(verbose)
 
-    def chooseAction(self, opts, table, trumpCard, deckSize, opponentHandSize, trashCards, weights):
+    def chooseAction(self, opts, table, trumpCard, deckSize, opponentHandSize, weights):
         maxV = None
         maxI = None
         for i, card in enumerate(opts):
             newHand = copy.deepcopy(self.hand)
             newHand.remove(card)
             features = extractFeatures(newHand, self.opponentHand, opponentHandSize,
-                                       trumpCard, table + [card], deckSize, trashCards)
-            z = sum(w * feature for w, feature in zip(weights, features))
-            v = 1.0 / (1 + math.exp(-z))
+                                       trumpCard, table + [card], deckSize, self.unseenCards)
+            v = logisticValue(weights, features)
             if maxV is None or v > maxV:
                 maxV = v
                 maxI = i
@@ -306,16 +344,17 @@ class ReflexCPUPlayer(Player):
 
     def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
         maxI, maxV = self.chooseAction(self.hand, [], trumpCard, deckSize,
-                                       opponentHandSize, trashCards, self.attackWeights)
+                                       opponentHandSize, self.attackWeights)
         return maxI
 
     def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
         maxI, maxV = self.chooseAction(options, table, trumpCard, deckSize,
-                                       opponentHandSize, trashCards, self.attackWeights)
-        stopFeatures = extractFeatures(self.hand, self.opponentHand, opponentHandSize,
-                                       trumpCard, [], deckSize, trashCards + table)
-        stopZ = sum(w * feature for w, feature in zip(self.attackWeights, stopFeatures))
-        stopV = 1.0 / (1 + math.exp(-stopZ))
+                                       opponentHandSize, self.attackWeights)
+
+        newDeckSize = deckSize - max(0, 6 - len(self.hand)) - max(0, 6 - opponentHandSize)
+        stopFeatures = extractFeatures(self.hand, self.opponentHand, max(opponentHandSize, 6),
+                                       trumpCard, [], newDeckSize, self.unseenCards)
+        stopV = logisticValue(self.attackWeights, stopFeatures)
         if stopV > maxV:
             return -1
         else:
@@ -323,15 +362,42 @@ class ReflexCPUPlayer(Player):
 
     def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
         maxI, maxV = self.chooseAction(options, table, trumpCard, deckSize,
-                                       opponentHandSize, trashCards, self.defendWeights)
-        stopFeatures = extractFeatures(self.hand + table, self.opponentHand, opponentHandSize,
-                                       trumpCard, [], deckSize, trashCards)
-        stopZ = sum(w * feature for w, feature in zip(self.defendWeights, stopFeatures))
-        stopV = 1.0 / (1 + math.exp(-stopZ))
+                                       opponentHandSize, self.defendWeights)
+
+        newDeckSize = deckSize - max(0, 6 - len(self.hand + table)) - max(0, 6 - opponentHandSize)
+        stopFeatures = extractFeatures(self.hand + table, self.opponentHand, max(opponentHandSize, 6),
+                                       trumpCard, [], newDeckSize, self.unseenCards)
+        stopV = logisticValue(self.defendWeights, stopFeatures)
         if stopV > maxV:
             return -1
         else:
             return maxI
+
+    def TDUpdateAttack(self, state, newState, reward):
+        stateFeatures = extractFeatures(*state)
+        value = logisticValue(self.attackWeights, stateFeatures)
+        residual = reward - value
+        if newState is not None:
+            newStateFeatures = extractFeatures(*newState)
+            residual += logisticValue(self.attackWeights, newStateFeatures)
+        gradient = [value * (1 - value) * feature for feature in stateFeatures]
+        newWeights = [w + 1e-1 * residual * gradient_i
+                      for w, gradient_i in zip(self.attackWeights, gradient)]
+        self.attackWeights = newWeights
+
+    def TDUpdateDefend(self, state, newState, reward):
+        if state is None: return
+
+        stateFeatures = extractFeatures(*state)
+        value = logisticValue(self.defendWeights, stateFeatures)
+        residual = reward - value
+        if newState is not None:
+            newStateFeatures = extractFeatures(*newState)
+            residual += logisticValue(self.defendWeights, newStateFeatures)
+        gradient = [value * (1 - value) * feature for feature in stateFeatures]
+        newWeights = [w + 1e-1 * residual * gradient_i
+                      for w, gradient_i in zip(self.defendWeights, gradient)]
+        self.defendWeights = newWeights
 
     @staticmethod
     def writeWeights():
@@ -346,9 +412,9 @@ class ReflexCPUPlayer(Player):
             with open('reflex_attack', 'r') as f:
                 ReflexCPUPlayer.attackWeights = pickle.load(f)
         except IOError:
-            ReflexCPUPlayer.attackWeights = [random.gauss(0, 1e-2) for _ in range(23)]
+            ReflexCPUPlayer.attackWeights = [random.gauss(0, 1e-2) for _ in range(29)]
         try:
             with open('reflex_defend', 'r') as f:
                 ReflexCPUPlayer.defendWeights = pickle.load(f)
         except IOError:
-            ReflexCPUPlayer.defendWeights = [random.gauss(0, 1e-2) for _ in range(23)]
+            ReflexCPUPlayer.defendWeights = [random.gauss(0, 1e-2) for _ in range(29)]

@@ -23,6 +23,9 @@ class Card:
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __hash__(self):
+        return hash((self.rank, self.suit))
+
     def __repr__(self):
         rankString = Card.ROYALS.get(self.rank, str(self.rank))
         suitString = Card.SUITS[self.suit]
@@ -47,6 +50,7 @@ def parseArgs():
     parser.add_argument('-n', '--numGames', type=int, default=1,
                         help="Number of games to play")
     parser.add_argument('-l', '--logFile', help="Where to save the game log file")
+    parser.add_argument('-t', '--train', action='store_true', help='Train the AI')
     return parser.parse_args()
 
 
@@ -99,19 +103,22 @@ def getPlayOrder(pOne, pTwo, trumpSuit):
 
 def playGame(args, log, pOne, pTwo):
     deck = getDeck()
-    trumpCard = deck.pop() 
-    trumpSuit = trumpCard.suit
+    trumpCard = deck.pop()
     deck.insert(0, trumpCard)
     log.newGame(trumpCard)
 
     pOne.refillHand(deck)
     pTwo.refillHand(deck)
-    attacker, defender = getPlayOrder(pOne, pTwo, trumpSuit)
+    attacker, defender = getPlayOrder(pOne, pTwo, trumpCard.suit)
     attacker.isAttacker = True
     defender.isAttacker = False
 
     table = []
     trashCards = []
+    preAttackState = None
+    postAttackState = None
+    preDefendState = None
+    postDefendState = None
     while True:
         if args.verbose >= 1:
             print "\nTrump card: ", trumpCard
@@ -121,17 +128,29 @@ def playGame(args, log, pOne, pTwo):
             print "%s cards left: " % pTwo.name, len(pTwo.hand)
 
         log.newRound(len(deck), trashCards)
+        preAttackState = (attacker.hand, attacker.opponentHand, len(defender.hand),
+                          trumpCard, table, len(deck), attacker.unseenCards)
         while True:
             attackCard = attacker.attack(table, trumpCard, len(deck),
                                          len(defender.hand), trashCards)
             defender.removeOpponentCard(attackCard)
             log.recordMove(attacker, defender, attackCard, table)
+            if args.train:
+                postAttackState = (defender.hand, defender.opponentHand, len(attacker.hand),
+                                   trumpCard, table, len(deck), defender.unseenCards)
+                defender.TDUpdateDefend(preDefendState, postAttackState, 0)
+                preDefendState = postAttackState
             if not attacker.success or len(attacker.hand) == 0: break
 
             defendCard = defender.defend(table, trumpCard, len(deck),
                                          len(attacker.hand), trashCards)
             attacker.removeOpponentCard(defendCard)
             log.recordMove(defender, attacker, defendCard, table)
+            if args.train:
+                postDefendState = (attacker.hand, attacker.opponentHand, len(defender.hand),
+                                   trumpCard, table, len(deck), attacker.unseenCards)
+                attacker.TDUpdateAttack(preAttackState, postDefendState, 0)
+                preAttackState = postDefendState
             if not defender.success or len(defender.hand) == 0: break
 
         if len(deck) == 0 and (len(defender.hand) == 0 or len(attacker.hand) == 0):
@@ -159,9 +178,12 @@ def playGame(args, log, pOne, pTwo):
         # 6 cards. The attacker took the rest of the deck, so the defender (new attacker)
         # has 0 cards in his hand.
         if len(deck) == 0 and len(attacker.hand) == 0:
+            preAttackState = (attacker.hand, attacker.opponentHand, len(defender.hand),
+                              trumpCard, table, len(deck), trashCards)
             break
         table = []
 
+    # TODO update weights on tie
     if len(defender.hand) == 0:
         if len(attacker.hand) == 1:
             attackCard = attacker.attack(table, trumpCard, 0, 0, trashCards)
@@ -171,12 +193,15 @@ def playGame(args, log, pOne, pTwo):
                     print "Tie game!"
                 log.endRound(True)
                 log.declareTie()
-        else:
-            if args.verbose >= 1:
-                print "%s wins!" % defender.name
-            log.endRound(False)
-            defender.wins += 1
-            log.declareWinner(defender)
+                return
+        if args.verbose >= 1:
+            print "%s wins!" % defender.name
+        log.endRound(False)
+        defender.wins += 1
+        log.declareWinner(defender)
+        if args.train:
+            defender.TDUpdateDefend(preDefendState, None, 1)
+            attacker.TDUpdateAttack(preAttackState, None, -1)
     elif len(attacker.hand) == 0:
         if len(defender.hand) == 1:
             defendCard = defender.defend(table, trumpCard, 0, 0, trashCards)
@@ -186,19 +211,26 @@ def playGame(args, log, pOne, pTwo):
                     print "Tie game!"
                 log.endRound(False)
                 log.declareTie()
-        else:
-            if args.verbose >= 1:
-                print "%s wins!" % attacker.name
-            log.endRound(True)
-            attacker.wins += 1
-            log.declareWinner(attacker)
+                return
+        if args.verbose >= 1:
+            print "%s wins!" % attacker.name
+        log.endRound(True)
+        attacker.wins += 1
+        log.declareWinner(attacker)
+        if args.train:
+            attacker.TDUpdateAttack(preAttackState, None, 1)
+            defender.TDUpdateDefend(preDefendState, None, -1)
 
 
 def main():
     args = parseArgs()
     player.ReflexCPUPlayer.loadWeights()
 
-    pOne, pTwo = getPlayers(args.player, args.verbose)
+    if args.train:
+        pOne = player.ReflexCPUPlayer(args.verbose)
+        pTwo = player.ReflexCPUPlayer(args.verbose)
+    else:
+        pOne, pTwo = getPlayers(args.player, args.verbose)
     log = logger.Logger(pOne, pTwo)
     for i in range(args.numGames):
         playGame(args, log, pOne, pTwo)
