@@ -69,9 +69,17 @@ class CardSet(object):
     def __str__(self):
         return repr(self)
 
+    def __contains__(self, card):
+        if not isinstance(card, Card):
+            return False
+
+        return card in self.groupedByRank[card.rank] and card in self.groupedBySuit[card.suit]
+
     def addCard(self, card):
         if not isinstance(card, Card):
             raise TypeError('Tried to add something other than a Card to a CardSet')
+        if card in self:
+            return
 
         self.groupedByRank[card.rank].add(card)
         self.groupedBySuit[card.suit].add(card)
@@ -84,12 +92,11 @@ class CardSet(object):
     def removeCard(self, card):
         if not isinstance(card, Card):
             raise TypeError('Tried to add something other than a Card to a CardSet')
-
-        try:
-            self.groupedByRank[card.rank].remove(card)
-            self.groupedBySuit[card.suit].remove(card)
-        except KeyError:
+        if card not in self:
             return
+
+        self.groupedByRank[card.rank].remove(card)
+        self.groupedBySuit[card.suit].remove(card)
         self.size -= 1
 
     def getCardsForSuit(self, suit):
@@ -140,7 +147,6 @@ class Durak:
 
     def newGame(self):
         self.hand = [CardSet(), CardSet()]
-        self.predictedHand = [CardSet(), CardSet()]  # for card counting
         self.deck = Card.getDeck()
         self.table = Table()
         self.trash = CardSet()
@@ -149,12 +155,23 @@ class Durak:
         self.roundWinner = None
         self.winner = None
 
+        ## card counting tools
+        self.knownHand = [CardSet(), CardSet()]
+        self.unseenCards = [CardSet(), CardSet()]
+        for card in self.deck:
+            self.unseenCards[0].addCard(card)
+            self.unseenCards[1].addCard(card)
+
         self.trumpCard = self.deck.pop(0)
         self.deck.append(self.trumpCard)
         for _ in xrange(6):
-            self.hand[0].addCard(self.deck.pop(0))
+            card = self.deck.pop(0)
+            self.hand[0].addCard(card)
+            self.unseenCards[0].removeCard(card)
         for _ in xrange(6):
-            self.hand[1].addCard(self.deck.pop(0))
+            card = self.deck.pop(0)
+            self.hand[1].addCard(card)
+            self.unseenCards[1].removeCard(card)
 
     def getFirstAttacker(self):
         trumpsA = self.hand[0].getCardsForSuit(self.trumpCard.suit)
@@ -214,7 +231,8 @@ class Durak:
             return
 
         self.hand[player].removeCard(card)
-        self.predictedHand[player].removeCard(card)
+        self.knownHand[player].removeCard(card)
+        self.unseenCards[opponent].removeCard(card)
         self.table.addCard(card)
 
         if len(self.hand[player]) == 0:
@@ -224,11 +242,15 @@ class Durak:
 
     def refillHands(self):
         while len(self.hand[self.attacker]) < 6 and len(self.deck) > 0:
-            self.hand[self.attacker].addCard(self.deck.pop(0))
+            card = self.deck.pop(0)
+            self.hand[self.attacker].addCard(card)
+            self.unseenCards[self.attacker].removeCard(card)
 
         defender = int(not self.attacker)
         while len(self.hand[defender]) < 6 and len(self.deck) > 0:
-            self.hand[defender].addCard(self.deck.pop(0))
+            card = self.deck.pop(0)
+            self.hand[defender].addCard(card)
+            self.unseenCards[defender].removeCard(card)
 
     def endRound(self):
         if self.roundWinner is None:
@@ -237,7 +259,7 @@ class Durak:
         defender = int(not self.attacker)
         if self.attacker == self.roundWinner:
             self.hand[defender].addCards(self.table.getCards())
-            self.predictedHand[defender].addCards(self.table.getCards())
+            self.knownHand[defender].addCards(self.table.getCards())
         else:
             self.trash.addCards(self.table.getCards())
 
@@ -245,7 +267,7 @@ class Durak:
         self.refillHands()
         if self.attacker != self.roundWinner:
             self.attacker = defender
-        self.roundWinner = None
+        self.roundWinner = None  # reset the round winner
 
         # Edge case: last round, the defender ran out of cards & the attacker got under
         # 6 cards. The attacker took the rest of the deck, so the defender (new attacker)
@@ -261,11 +283,26 @@ class Durak:
         # see playCard for deciding winners
         return self.winner is not None
 
-    def winner(self):
-        return self.winner
-
     def isWinner(self, player):
         return self.gameOver() and player == self.winner
 
     def isLoser(self, player):
         return self.gameOver() and player != self.winner
+
+    def isRoundWinner(self, player):
+        return self.roundOver() and player == self.roundWinner
+
+    def getState(self, player):
+        opponent = int(not player)
+        state = {
+            'isAttacker': player == self.attacker,
+            'trumpSuit': self.trumpCard.suit,
+            'hand': self.hand[player],
+            'knownOpponentHand': self.knownHand[opponent],
+            'opponentHandSize': len(self.hand[opponent]),
+            'deckSize': len(self.deck),
+            'table': self.table,
+            'trash': self.trash,
+            'unseen': self.unseenCards[player]
+        }
+        return state
