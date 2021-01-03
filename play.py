@@ -59,7 +59,7 @@ def train(args):
         agent.setDefendWeights(w_def)
 
     g = dk.Durak()
-    for i in xrange(args.numGames):
+    for i in range(args.numGames):
         attacker = g.getFirstAttacker()
         defender = int(not attacker)
         while True:
@@ -119,11 +119,11 @@ def train(args):
             defender = int(not attacker)
 
         if i % 50 == 0:
-            print 'Training iteration: %d / %d' % (i, args.numGames)
+            print('Training iteration: %d / %d' % (i, args.numGames))
             randomAgent = agt.RandomAgent()
             simpleAgent = agt.SimpleAgent()
             winCounts = {'random': 0, 'simple': 0}
-            for _ in xrange(500):
+            for _ in range(500):
                 winVsRandom = play(dk.Durak(), [randomAgent, agents[0]])
                 winVsSimple = play(dk.Durak(), [simpleAgent, agents[0]])
                 winCounts['random'] += winVsRandom
@@ -197,14 +197,14 @@ def main(args):
     agents[1] = getAgent(args.opponent, 1)
 
     g = dk.Durak()
-    for i in xrange(args.numGames):
+    for i in range(args.numGames):
         winner = play(g, agents)
         winCounts[winner] += 1
-        print 'Game %d winner: %d' % (i, winner)
+        print('Game %d winner: %d' % (i, winner))
         g.newGame()
-    print 'Win percentages:'
-    print 'Agent: %d/%d' % (winCounts[0], args.numGames)
-    print 'Opponent: %d/%d' % (winCounts[1], args.numGames)
+    print('Win percentages:')
+    print('Agent: %d/%d' % (winCounts[0], args.numGames))
+    print('Opponent: %d/%d' % (winCounts[1], args.numGames))
 
 
 if __name__ == '__main__':
