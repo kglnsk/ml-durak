@@ -183,7 +183,7 @@ class Durak:
             self.attacker = 1
         elif len(trumpsB) == 0:
             self.attacker = 0
-        elif min(trumpsA, key=lambda c: c.rank) > min(trumpsB, key=lambda c: c.rank):
+        elif min(trumpsA, key=lambda c: c.rank).rank > min(trumpsB, key=lambda c: c.rank).rank:
             self.attacker = 1
         else:
             self.attacker = 0
