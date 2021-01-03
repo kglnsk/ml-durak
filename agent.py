@@ -21,21 +21,21 @@ class HumanAgent(Agent):
 
     def printInfo(self, game):
         opponent = int(not self.playerNum)
-        print 'Your hand: ', game.hand[self.playerNum]
-        print 'The table: ', game.table
-        print 'Trump suit: ', dk.Card.SUITS[game.trumpCard.suit]
-        print '# cards left: ', len(game.deck)
-        print '# opponent cards: ', len(game.hand[opponent])
+        print('Your hand: ', game.hand[self.playerNum])
+        print('The table: ', game.table)
+        print('Trump suit: ', dk.Card.SUITS[game.trumpCard.suit])
+        print('# cards left: ', len(game.deck))
+        print('# opponent cards: ', len(game.hand[opponent]))
 
     def getAttackCard(self, cards, game):
         self.printInfo(game)
         if cards[-1] != dk.Durak.END_ROUND:
-            print 'Your options: ', cards
+            print('Your options: ', cards)
             index = util.readIntegerInRange(0, len(cards),
                                             'Select a card to begin attack: ')
         else:
             cards.remove(dk.Durak.END_ROUND)
-            print 'Your options: ', cards
+            print('Your options: ', cards)
             index = util.readIntegerInRange(-1, len(cards) - 1,
                                             'Select a card to attack (-1 to stop): ')
 
@@ -46,7 +46,7 @@ class HumanAgent(Agent):
 
     def getDefendCard(self, cards, game):
         self.printInfo(game)
-        print 'Your options: ', cards
+        print('Your options: ', cards)
         index = util.readIntegerInRange(-1, len(cards) - 1,
                                         'Select a card to defend (-1 to surrender): ')
         if index == -1:
@@ -94,14 +94,14 @@ class ReflexAgent(Agent):
             with open('reflex_attack.bin', 'r') as f_atk:
                 self.w_atk = pickle.load(f_atk)
         except IOError:
-            print 'ReflexAgent: Initializing new attack weights'
+            print('ReflexAgent: Initializing new attack weights')
             self.w_atk = np.random.normal(0, 1e-2, (util.NUM_FEATURES,))
 
         try:
             with open('reflex_defend.bin', 'r') as f_def:
                 self.w_def = pickle.load(f_def)
         except IOError:
-            print 'ReflexAgent: Initializing new defense weights'
+            print('ReflexAgent: Initializing new defense weights')
             self.w_def = np.random.normal(0, 1e-2, (util.NUM_FEATURES,))
 
     def setAttackWeights(self, atkWeights):
@@ -146,14 +146,14 @@ class SimpleEnhancedAgent(SimpleAgent):
             with open('simple_enhanced_attack.bin', 'r') as f_atk:
                 self.w_atk = pickle.load(f_atk)
         except IOError:
-            print 'SimpleEnhancedAgent: Initializing new attack weights'
+            print('SimpleEnhancedAgent: Initializing new attack weights')
             self.w_atk = np.random.normal(0, 1e-2, (util.NUM_FEATURES,))
 
         try:
             with open('simple_enhanced_defend.bin', 'r') as f_def:
                 self.w_def = pickle.load(f_def)
         except IOError:
-            print 'SimpleEnhancedAgent: Initializing new defense weights'
+            print('SimpleEnhancedAgent: Initializing new defense weights')
             self.w_def = np.random.normal(0, 1e-2, (util.NUM_FEATURES,))
 
     def setAttackWeights(self, atkWeights):

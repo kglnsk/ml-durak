@@ -164,11 +164,11 @@ class Durak:
 
         self.trumpCard = self.deck.pop(0)
         self.deck.append(self.trumpCard)
-        for _ in xrange(6):
+        for _ in range(6):
             card = self.deck.pop(0)
             self.hand[0].addCard(card)
             self.unseenCards[0].removeCard(card)
-        for _ in xrange(6):
+        for _ in range(6):
             card = self.deck.pop(0)
             self.hand[1].addCard(card)
             self.unseenCards[1].removeCard(card)

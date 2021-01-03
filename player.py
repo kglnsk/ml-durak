@@ -31,9 +31,9 @@ class Player(object):
         Player.NO_VALID_MOVES, or Player.PASS_TURN as appropriate.
         """
         if self.verbose >= 1:
-            print "----ATTACK----"
-            print "  %s's hand: " % self.name, self.hand
-            print "  The table: ", table
+            print("----ATTACK----")
+            print("  %s's hand: " % self.name, self.hand)
+            print("  The table: ", table)
 
         if len(table) == 0:
             i = self.beginAttack(trumpCard, deckSize, opponentHandSize, trashCards)
@@ -43,7 +43,7 @@ class Player(object):
             if len(attackingOptions) == 0:
                 self.success = False
                 if self.verbose >= 1:
-                    print "  %s cannot attack." % self.name
+                    print("  %s cannot attack." % self.name)
                 return Player.NO_VALID_MOVES
 
             i = self.chooseAttackCard(attackingOptions, table, trumpCard,
@@ -51,7 +51,7 @@ class Player(object):
             if i == -1:
                 self.success = False
                 if self.verbose >= 1:
-                    print "  %s gives up the attack." % self.name
+                    print("  %s gives up the attack." % self.name)
                 return Player.PASS_TURN
             attackCard = attackingOptions[i]
 
@@ -61,7 +61,7 @@ class Player(object):
             self.maxCards[attackCard.suit] -= 1
         self.success = True
         if self.verbose >= 1:
-            print "  %s attacks with %s" % (self.name, attackCard)
+            print("  %s attacks with %s" % (self.name, attackCard))
         return attackCard
 
     def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
@@ -85,15 +85,15 @@ class Player(object):
         player chose, Player.NO_VALID_MOVES, or Player.PASS_TURN as appropriate.
         """
         if self.verbose >= 1:
-            print "----DEFEND----"
-            print "  %s's hand: " % self.name, self.hand
-            print "  The table: ", table
+            print("----DEFEND----")
+            print("  %s's hand: " % self.name, self.hand)
+            print("  The table: ", table)
 
         defendingOptions = self.getDefendingCards(table[0], trumpCard.suit)
         if len(defendingOptions) == 0:
             self.success = False
             if self.verbose >= 1:
-                print "  %s cannot defend." % self.name
+                print("  %s cannot defend." % self.name)
             return Player.NO_VALID_MOVES
 
         i = self.chooseDefenseCard(defendingOptions, table, trumpCard,
@@ -101,7 +101,7 @@ class Player(object):
         if i == -1:
             self.success = False
             if self.verbose >= 1:
-                print "  %s surrenders." % self.name
+                print("  %s surrenders." % self.name)
             return Player.PASS_TURN
 
         table.insert(0, defendingOptions[i])
@@ -110,7 +110,7 @@ class Player(object):
             self.maxCards[defendingOptions[i].suit] -= 1
         self.success = True
         if self.verbose >= 1:
-            print "  %s defends with %s" % (self.name, defendingOptions[i])
+            print("  %s defends with %s" % (self.name, defendingOptions[i]))
         return defendingOptions[i]
 
     def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
@@ -200,20 +200,20 @@ class HumanPlayer(Player):
                                        "  Select a card to begin attack, %s: " % self.name)
 
     def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
-        print "  Attacking options: ", options
+        print("  Attacking options: ", options)
         return util.readIntegerInRange(-1, len(options),
                                        "  Select a card, %s (-1 to stop attack): " % self.name)
 
     def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
-        print "  Defending options: ", options
+        print("  Defending options: ", options)
         return util.readIntegerInRange(-1, len(options),
                                        "  Select a card, %s (-1 to surrender): " % self.name)
 
     def rename(self):
         if self.verbose >= 1:
-            print "Player %s, what would you like to call yourself?" % self.name
+            print("Player %s, what would you like to call yourself?" % self.name)
 
-        name = raw_input()
+        name = input()
         if name != '':
             self.name = name
 
