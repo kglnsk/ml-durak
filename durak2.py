@@ -5,7 +5,7 @@ import random
 class Card:
     SUITS = {0: 'C', 1: 'H', 2: 'D', 3: 'S'}
     ROYALS = {11: 'J', 12: 'Q', 13: 'K', 14: 'A'}
-    RANKS = range(6, 14 + 1)
+    RANKS = list(range(6, 14 + 1))
 
     def __init__(self, suit, rank):
         self.rank = rank
@@ -212,8 +212,7 @@ class Durak:
         Ending the round is always the last option in the list.
         """
         topCard = self.table.getTopCard()
-        cards = filter(lambda c: c.rank > topCard.rank,
-                       self.hand[player].getCardsForSuit(topCard.suit))
+        cards = [c for c in self.hand[player].getCardsForSuit(topCard.suit) if c.rank > topCard.rank]
         if topCard.suit != self.trumpCard.suit:
             cards.extend(self.hand[player].getCardsForSuit(self.trumpCard.suit))
         cards.append(Durak.END_ROUND)

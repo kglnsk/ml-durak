@@ -5,13 +5,13 @@ import numpy as np
 
 def readIntegerInRange(minimum, maximum, prompt=''):
     while True:
-        text = input(prompt)
+        text = eval(input(prompt))
         try:
             num = int(text)
             if num in range(minimum, maximum):
                 return num
             else: 
-                print("Out of range [%s, %s), try again" % (minimum, maximum))
+                print(("Out of range [%s, %s), try again" % (minimum, maximum)))
         except ValueError:
             print("Not an int, try again")
 
@@ -32,10 +32,8 @@ def getNumOpponentMoves(state):
 
     if state['isAttacker'] and len(state['table']) > 0:
         topCard = state['table'].getTopCard()
-        nOpponentMoves += len(filter(lambda c: c.rank > topCard.rank,
-                                     state['knownOpponentHand'].getCardsForSuit(topCard.suit)))
-        K += len(filter(lambda c: c.rank > topCard.rank,
-                        state['unseen'].getCardsForSuit(topCard.suit)))
+        nOpponentMoves += len([c for c in state['knownOpponentHand'].getCardsForSuit(topCard.suit) if c.rank > topCard.rank])
+        K += len([c for c in state['unseen'].getCardsForSuit(topCard.suit) if c.rank > topCard.rank])
         if topCard.suit != state['trumpSuit']:
             nOpponentMoves += len(state['knownOpponentHand'].getCardsForSuit(state['trumpSuit']))
             K += len(state['unseen'].getCardsForSuit(state['trumpSuit']))

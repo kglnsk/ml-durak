@@ -119,7 +119,7 @@ def train(args):
             defender = int(not attacker)
 
         if i % 50 == 0:
-            print('Training iteration: %d / %d' % (i, args.numGames))
+            print(('Training iteration: %d / %d' % (i, args.numGames)))
             randomAgent = agt.RandomAgent()
             simpleAgent = agt.SimpleAgent()
             winCounts = {'random': 0, 'simple': 0}
@@ -200,11 +200,11 @@ def main(args):
     for i in range(args.numGames):
         winner = play(g, agents)
         winCounts[winner] += 1
-        print('Game %d winner: %d' % (i, winner))
+        print(('Game %d winner: %d' % (i, winner)))
         g.newGame()
     print('Win percentages:')
-    print('Agent: %d/%d' % (winCounts[0], args.numGames))
-    print('Opponent: %d/%d' % (winCounts[1], args.numGames))
+    print(('Agent: %d/%d' % (winCounts[0], args.numGames)))
+    print(('Opponent: %d/%d' % (winCounts[1], args.numGames)))
 
 
 if __name__ == '__main__':

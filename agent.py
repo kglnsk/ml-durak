@@ -21,21 +21,21 @@ class HumanAgent(Agent):
 
     def printInfo(self, game):
         opponent = int(not self.playerNum)
-        print('Your hand: ', game.hand[self.playerNum])
-        print('The table: ', game.table)
-        print('Trump suit: ', dk.Card.SUITS[game.trumpCard.suit])
-        print('# cards left: ', len(game.deck))
-        print('# opponent cards: ', len(game.hand[opponent]))
+        print(('Your hand: ', game.hand[self.playerNum]))
+        print(('The table: ', game.table))
+        print(('Trump suit: ', dk.Card.SUITS[game.trumpCard.suit]))
+        print(('# cards left: ', len(game.deck)))
+        print(('# opponent cards: ', len(game.hand[opponent])))
 
     def getAttackCard(self, cards, game):
         self.printInfo(game)
         if cards[-1] != dk.Durak.END_ROUND:
-            print('Your options: ', cards)
+            print(('Your options: ', cards))
             index = util.readIntegerInRange(0, len(cards),
                                             'Select a card to begin attack: ')
         else:
             cards.remove(dk.Durak.END_ROUND)
-            print('Your options: ', cards)
+            print(('Your options: ', cards))
             index = util.readIntegerInRange(-1, len(cards) - 1,
                                             'Select a card to attack (-1 to stop): ')
 
@@ -46,7 +46,7 @@ class HumanAgent(Agent):
 
     def getDefendCard(self, cards, game):
         self.printInfo(game)
-        print('Your options: ', cards)
+        print(('Your options: ', cards))
         index = util.readIntegerInRange(-1, len(cards) - 1,
                                         'Select a card to defend (-1 to surrender): ')
         if index == -1:
@@ -68,8 +68,8 @@ class SimpleAgent(Agent):
         if cards[-1] == dk.Durak.END_ROUND:
             cards = cards[:-1]
         sortedCards = sorted(cards, key=lambda c: c.rank)
-        trumpCards = filter(lambda c: c.suit == trumpSuit, sortedCards)
-        nonTrumpCards = filter(lambda c: c.suit != trumpSuit, sortedCards)
+        trumpCards = [c for c in sortedCards if c.suit == trumpSuit]
+        nonTrumpCards = [c for c in sortedCards if c.suit != trumpSuit]
         if len(nonTrumpCards) > 0:
             return nonTrumpCards[0]
         elif len(trumpCards) > 0:

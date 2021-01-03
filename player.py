@@ -32,8 +32,8 @@ class Player(object):
         """
         if self.verbose >= 1:
             print("----ATTACK----")
-            print("  %s's hand: " % self.name, self.hand)
-            print("  The table: ", table)
+            print(("  %s's hand: " % self.name, self.hand))
+            print(("  The table: ", table))
 
         if len(table) == 0:
             i = self.beginAttack(trumpCard, deckSize, opponentHandSize, trashCards)
@@ -43,7 +43,7 @@ class Player(object):
             if len(attackingOptions) == 0:
                 self.success = False
                 if self.verbose >= 1:
-                    print("  %s cannot attack." % self.name)
+                    print(("  %s cannot attack." % self.name))
                 return Player.NO_VALID_MOVES
 
             i = self.chooseAttackCard(attackingOptions, table, trumpCard,
@@ -51,7 +51,7 @@ class Player(object):
             if i == -1:
                 self.success = False
                 if self.verbose >= 1:
-                    print("  %s gives up the attack." % self.name)
+                    print(("  %s gives up the attack." % self.name))
                 return Player.PASS_TURN
             attackCard = attackingOptions[i]
 
@@ -61,7 +61,7 @@ class Player(object):
             self.maxCards[attackCard.suit] -= 1
         self.success = True
         if self.verbose >= 1:
-            print("  %s attacks with %s" % (self.name, attackCard))
+            print(("  %s attacks with %s" % (self.name, attackCard)))
         return attackCard
 
     def beginAttack(self, trumpCard, deckSize, opponentHandSize, trashCards):
@@ -86,14 +86,14 @@ class Player(object):
         """
         if self.verbose >= 1:
             print("----DEFEND----")
-            print("  %s's hand: " % self.name, self.hand)
-            print("  The table: ", table)
+            print(("  %s's hand: " % self.name, self.hand))
+            print(("  The table: ", table))
 
         defendingOptions = self.getDefendingCards(table[0], trumpCard.suit)
         if len(defendingOptions) == 0:
             self.success = False
             if self.verbose >= 1:
-                print("  %s cannot defend." % self.name)
+                print(("  %s cannot defend." % self.name))
             return Player.NO_VALID_MOVES
 
         i = self.chooseDefenseCard(defendingOptions, table, trumpCard,
@@ -101,7 +101,7 @@ class Player(object):
         if i == -1:
             self.success = False
             if self.verbose >= 1:
-                print("  %s surrenders." % self.name)
+                print(("  %s surrenders." % self.name))
             return Player.PASS_TURN
 
         table.insert(0, defendingOptions[i])
@@ -110,7 +110,7 @@ class Player(object):
             self.maxCards[defendingOptions[i].suit] -= 1
         self.success = True
         if self.verbose >= 1:
-            print("  %s defends with %s" % (self.name, defendingOptions[i]))
+            print(("  %s defends with %s" % (self.name, defendingOptions[i])))
         return defendingOptions[i]
 
     def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
@@ -133,7 +133,7 @@ class Player(object):
         of the cards on the table.
         """
         validRanks = set([card.rank for card in table])
-        return filter(lambda c: c.rank in validRanks, self.hand)
+        return [c for c in self.hand if c.rank in validRanks]
 
     def getDefendingCards(self, aCard, trumpSuit):
         """
@@ -141,9 +141,9 @@ class Player(object):
         but of higher rank. If the attacking card is not a trump card, any trump
         cards are also valid attacking cards.
         """
-        cards = filter(lambda c: c.suit == aCard.suit and c.rank > aCard.rank, self.hand)
+        cards = [c for c in self.hand if c.suit == aCard.suit and c.rank > aCard.rank]
         if aCard.suit != trumpSuit:
-            cards.extend(filter(lambda c: c.suit == trumpSuit, self.hand))
+            cards.extend([c for c in self.hand if c.suit == trumpSuit])
         return cards
 
     def removeOpponentCard(self, card):
@@ -200,20 +200,20 @@ class HumanPlayer(Player):
                                        "  Select a card to begin attack, %s: " % self.name)
 
     def chooseAttackCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
-        print("  Attacking options: ", options)
+        print(("  Attacking options: ", options))
         return util.readIntegerInRange(-1, len(options),
                                        "  Select a card, %s (-1 to stop attack): " % self.name)
 
     def chooseDefenseCard(self, options, table, trumpCard, deckSize, opponentHandSize, trashCards):
-        print("  Defending options: ", options)
+        print(("  Defending options: ", options))
         return util.readIntegerInRange(-1, len(options),
                                        "  Select a card, %s (-1 to surrender): " % self.name)
 
     def rename(self):
         if self.verbose >= 1:
-            print("Player %s, what would you like to call yourself?" % self.name)
+            print(("Player %s, what would you like to call yourself?" % self.name))
 
-        name = input()
+        name = eval(input())
         if name != '':
             self.name = name
 
@@ -243,8 +243,8 @@ class SimpleCPUPlayer(Player):
 
     def policy(self, options, trumpSuit):
         sortedOptions = sorted(options, key=lambda c: c.rank)
-        nonTrumpCards = filter(lambda c: c.suit != trumpSuit, sortedOptions)
-        trumpCards = filter(lambda c: c.suit == trumpSuit, sortedOptions)
+        nonTrumpCards = [c for c in sortedOptions if c.suit != trumpSuit]
+        trumpCards = [c for c in sortedOptions if c.suit == trumpSuit]
         if len(nonTrumpCards) > 0:
             return options.index(nonTrumpCards[0])
         elif len(trumpCards) > 0:
@@ -275,28 +275,28 @@ def extractFeatures(hand, opponentHand, opponentHandSize,
                     trumpCard, table, deckSize, unseenCards):
     features = [len(hand), len(table), deckSize, opponentHandSize]
     for rank in durak.Card.RANKS:
-        rankCards = filter(lambda c: c.rank == rank, hand)
+        rankCards = [c for c in hand if c.rank == rank]
         features.append(len(rankCards))
-    royals = filter(lambda c: c.rank > 10, hand)
+    royals = [c for c in hand if c.rank > 10]
 
-    clubs = filter(lambda c: c.suit == 0, hand)
-    hearts = filter(lambda c: c.suit == 1, hand)
-    diamonds = filter(lambda c: c.suit == 2, hand)
-    spades = filter(lambda c: c.suit == 3, hand)
-    trumps = filter(lambda c: c.suit == trumpCard.suit, hand)
+    clubs = [c for c in hand if c.suit == 0]
+    hearts = [c for c in hand if c.suit == 1]
+    diamonds = [c for c in hand if c.suit == 2]
+    spades = [c for c in hand if c.suit == 3]
+    trumps = [c for c in hand if c.suit == trumpCard.suit]
 
     tableRanks = set([c.rank for c in table])
-    attackCards = filter(lambda c: c.rank in tableRanks, hand)
+    attackCards = [c for c in hand if c.rank in tableRanks]
     if len(tableRanks) > 0:
-        defendCards = filter(lambda c: c.rank > max(tableRanks) or c.suit == trumpCard.suit, hand)
+        defendCards = [c for c in hand if c.rank > max(tableRanks) or c.suit == trumpCard.suit]
     else:
         defendCards = hand
 
     # cards we know the opponent has
-    oppAttackCards = filter(lambda c: c.rank in tableRanks, opponentHand)
+    oppAttackCards = [c for c in opponentHand if c.rank in tableRanks]
     expAttackCards = len(oppAttackCards)
     if len(tableRanks) > 0:
-        oppDefendCards = filter(lambda c: c.rank > max(tableRanks) or c.suit == trumpCard.suit, opponentHand)
+        oppDefendCards = [c for c in opponentHand if c.rank > max(tableRanks) or c.suit == trumpCard.suit]
     else:
         oppDefendCards = opponentHand
     expDefendCards = len(oppDefendCards)

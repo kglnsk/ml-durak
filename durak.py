@@ -8,7 +8,7 @@ import logger
 class Card:
     SUITS = {0: 'C', 1: 'H', 2: 'D', 3: 'S'}
     ROYALS = {11: 'J', 12: 'Q', 13: 'K', 14: 'A'}
-    RANKS = range(6, 14 + 1)
+    RANKS = list(range(6, 14 + 1))
 
     def __init__(self, suit, rank):
         self.rank = rank
@@ -86,8 +86,8 @@ def getPlayOrder(pOne, pTwo, trumpSuit):
     player with the lowest ranking trump card in their hand. Used at the very
     beginning of a game of Durak.
     """
-    pOneTrumps = filter(lambda c: c.suit == trumpSuit, pOne.hand)
-    pTwoTrumps = filter(lambda c: c.suit == trumpSuit, pTwo.hand)
+    pOneTrumps = [c for c in pOne.hand if c.suit == trumpSuit]
+    pTwoTrumps = [c for c in pTwo.hand if c.suit == trumpSuit]
     
     if len(pOneTrumps) == 0 and len(pTwoTrumps) == 0:
         return pOne, pTwo
@@ -121,11 +121,11 @@ def playGame(args, log, pOne, pTwo):
     postDefendState = None
     while True:
         if args.verbose >= 1:
-            print("\nTrump card: ", trumpCard)
-            print("Cards left: ", len(deck))
+            print(("\nTrump card: ", trumpCard))
+            print(("Cards left: ", len(deck)))
         if args.verbose == 2:
-            print("%s cards left: " % pOne.name, len(pOne.hand))
-            print("%s cards left: " % pTwo.name, len(pTwo.hand))
+            print(("%s cards left: " % pOne.name, len(pOne.hand)))
+            print(("%s cards left: " % pTwo.name, len(pTwo.hand)))
 
         log.newRound(len(deck), trashCards)
         preAttackState = (attacker.hand, attacker.opponentHand, len(defender.hand),
@@ -158,7 +158,7 @@ def playGame(args, log, pOne, pTwo):
 
         if (defender.success and not attacker.success) or len(defender.hand) == 0:
             if args.verbose >= 1:
-                print("%s wins the round and gets to attack." % defender.name)
+                print(("%s wins the round and gets to attack." % defender.name))
             trashCards.extend(table)
             attacker.refillHand(deck)
             defender.refillHand(deck)
@@ -166,7 +166,7 @@ def playGame(args, log, pOne, pTwo):
             attacker, defender = defender, attacker
         elif (attacker.success and not defender.success) or len(attacker.hand) == 0:
             if args.verbose >= 1:
-                print("%s wins the round and remains the attacker." % attacker.name)
+                print(("%s wins the round and remains the attacker." % attacker.name))
             attacker.addOpponentCards(table)
             defender.addCards(table)
             # TODO option for attacker to give additional cards
@@ -195,7 +195,7 @@ def playGame(args, log, pOne, pTwo):
                 log.declareTie()
                 return
         if args.verbose >= 1:
-            print("%s wins!" % defender.name)
+            print(("%s wins!" % defender.name))
         log.endRound(False)
         defender.wins += 1
         log.declareWinner(defender)
@@ -213,7 +213,7 @@ def playGame(args, log, pOne, pTwo):
                 log.declareTie()
                 return
         if args.verbose >= 1:
-            print("%s wins!" % attacker.name)
+            print(("%s wins!" % attacker.name))
         log.endRound(True)
         attacker.wins += 1
         log.declareWinner(attacker)
@@ -236,8 +236,8 @@ def main():
         playGame(args, log, pOne, pTwo)
         pOne.reset()
         pTwo.reset()
-    print("%s wins: %d / %d" % (pOne.name, pOne.wins, args.numGames))
-    print("%s wins: %d / %d" % (pTwo.name, pTwo.wins, args.numGames))
+    print(("%s wins: %d / %d" % (pOne.name, pOne.wins, args.numGames)))
+    print(("%s wins: %d / %d" % (pTwo.name, pTwo.wins, args.numGames)))
 
     if args.logFile:
         log.write(args.logFile, pretty=True)
